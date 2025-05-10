@@ -1,0 +1,54 @@
+name: Trivy Full Scan
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  trivy-scan:
+    runs-on: ubuntu-latest
+
+    steps:
+    # 1. Checkout du code depuis GitHub
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    # 2. Installation de Trivy
+    - name: Install Trivy
+      run: |
+        wget https://github.com/aquasecurity/trivy/releases/latest/download/trivy_0.47.0_Linux-64bit.deb
+        sudo dpkg -i trivy_0.47.0_Linux-64bit.deb
+
+    # 3. Scan des fichiers de configuration (IaC, Dockerfile, YAML)
+    - name: Scan IaC configs (Dockerfile, Kubernetes YAML)
+      run: trivy config . --exit-code 0 --scanners config --severity HIGH,CRITICAL
+
+    # 4. Build de l'image Docker et scan de l'image construite
+    - name: Build Docker image for Backend
+      run: |
+        cd backend
+        docker build -t my-backend:latest .
+    
+    - name: Scan Backend Docker image
+      run: |
+        trivy image --exit-code 1 --severity HIGH,CRITICAL my-backend:latest
+
+    - name: Build Docker image for Frontend
+      run: |
+        cd frontend
+        docker build -t my-frontend:latest .
+    
+    - name: Scan Frontend Docker image
+      run: |
+        trivy image --exit-code 1 --severity HIGH,CRITICAL my-frontend:latest
+
+    # 5. Scan des dépendances Node.js (Backend et Frontend)
+    - name: Scan Backend Node.js dependencies
+      run: |
+        cd backend
+        trivy fs . --exit-code 0 --scanners vuln --severity HIGH,CRITICAL
+
+    - name: Scan Frontend Node.js dependencies
+      run: |
+        cd frontend
+        trivy fs . --exit-code 0 --scanners vuln --severity HIGH,CRITICAL
